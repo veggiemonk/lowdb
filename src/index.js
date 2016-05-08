@@ -1,63 +1,131 @@
-var Vue = require('vue')
-var low = require('lowdb')
-window.db = low('db')
+const Vue = require( 'vue' )
+const low = require( 'lowdb' )
+const storage = require( 'lowdb/browser' )
+const _ = require( 'lodash/fp' )
 
-var initialCode = [
-  "// db is also available in the console",
-  "db('posts').push({",
-  "  id: db('posts').size() + 1,",
-  "  title: 'some post'",
-  "})",
-  "",
-  "// Try to uncomment some of the code below",
-  "",
-  "// db('posts').find({ id: 5 })",
-  "// db('posts').find({ title: 'some post' })",
-  "// db('posts').last()",
-  "// db('posts').orderBy('id', 'desc')",
-  "",
-  "// db('comments').push({ text: 'some comment'})"
-].join('\n')
+const db = low( 'db', { storage } )
+window.db = db;
 
-var editor = CodeMirror.fromTextArea(document.getElementById('code'),  {
-  theme: 'material',
-})
+function downloadJSON( data, id ) {
+    let container = document.getElementById(id);
 
-editor.getDoc().setValue(initialCode)
+    let link = document.createElement('a');
+    link.href = `data:text/json;charset=utf-8,${encodeURIComponent( JSON.stringify( data ) )}`;
+    link.download = 'data.json';
+    link.title = 'Download JSON';
+    link.innerText = id;
+    container.replaceChild(link, container.firstChild);
+}
 
-Vue.filter('stringify', function (value) {
-  if (value === undefined) return 'undefined'
-  return JSON.stringify(value, null, 2)
-})
+downloadJSON(db.object,  'Database')
 
-Vue.filter('highlight', function (value) {
-  return hljs.highlight('json', value).value
-})
+// ----------------------------------------------------------
+// CODE MIRROR
 
-var vm = new Vue({
-  el: '#app',
-  data: {
-    error: '',
-    output: '',
-    object: db.object
-  },
-  methods: {
-    eval: function () {
-      this.error = ''
-      this.output = ''
-
-      try {
-        this.output = eval(editor.getValue())
-        this.object = Object.assign({}, db.object)
-      } catch (e) {
-        this.error = e.message
-      }
+var editor = CodeMirror.fromTextArea( document.getElementById( 'code' ), {
+    mode: 'javascript',
+    theme: 'material',
+    lineNumbers: true,
+    lineWrapping: false,
+    lineNumbers: true,
+    styleActiveLine: true,
+    matchBrackets: true,
+    extraKeys: { "Ctrl-Space": "autocomplete" },
+    onKeyEvent: function( i, e ) {
+        // Hook into ctrl-space
+        if ( e.keyCode == 32 && ( e.ctrlKey || e.metaKey ) && !e.altKey ) {
+            e.stop();
+            return startComplete();
+        }
     },
-    reset: function () {
-      editor.getDoc().setValue(initialCode)
-      db.object = {}
-      this.output = ''
-      this.object = Object.assign({}, db.object)
+    value: `<!doctype html>\n<html>\n  ${document.documentElement.innerHTML}\n</html>`
+
+} )
+
+const initialCode = [
+    "// db is also available in the console",
+    "db('posts').push({",
+    "  id: db('posts').size() + 1,",
+    "  title: 'some post'",
+    "})",
+    "",
+    " // db('posts').find({ id: 5 })",
+    " // db('posts').find({ title: 'some post' })",
+    " // db('posts').last()",
+    " // db('posts').orderBy('id', 'desc')",
+    "",
+    "// GENERATE DATA",
+    "",
+    "const qs = 'rows=10&firstname={firstName}&age={numberRange|20,80}';",
+    "const url = `http://www.filltext.com?${qs}`",
+    "// or try http://faker.hook.io?property=name.findName&locale=en",
+    "fetch(url)",
+    ".then( res => res.json() )",
+    ".catch( e => console.error(e) )",
+    ".then( json => db('users').push( ...json ) );",
+    "",
+    "// with this, api.users give the URL of the 'users' service",
+    "const entities = [ 'users', 'posts', 'login', 'reset', 'config'];",
+    "const api = _.reduce( ",
+    "  ( acc, key ) => _.assign( {",
+    "    [ key ]: `https://superapi.com/${key}`",
+    "  } )( acc ), {} )( entities );",
+    "",
+    "// db('api').push({ entities: api })",
+].join( '\n' )
+
+editor.getDoc().setValue( initialCode )
+
+
+// ----------------------------------------------------------
+// Vue
+Vue.filter( 'stringify', function( value ) {
+    if ( value === undefined ) return 'undefined'
+    return JSON.stringify( value, null, 2 )
+} )
+
+Vue.filter( 'highlight', function( value ) {
+    return hljs.highlight( 'json', value ).value
+} )
+
+const vm = new Vue( {
+    el: '#app',
+    data: {
+        error: '',
+        output: '',
+        object: db.object
+    },
+    methods: {
+        eval: function() {
+            this.error = ''
+            this.output = ''
+
+            try {
+                this.output = eval( editor.getValue() )
+                this.object = Object.assign( {}, db.object )
+                downloadJSON(this.object, 'Database')
+                downloadJSON(this.output, 'Output')
+                if ( this.output.then ) {
+                    const that = this;
+                    this.output.then( function( data ) {
+                        that.object = _.assign( {}, db.object )
+                        that.output = data;
+                        downloadJSON(that.object, 'Database')
+                        downloadJSON(that.output, 'Output')
+                    } );
+                }
+            } catch ( e ) {
+                this.error = e.message
+                throw new Error( e )
+            }
+        },
+        reset: function() {
+            editor.getDoc().setValue( initialCode )
+            db.object = {}
+            this.output = ''
+            this.object = Object.assign( {}, db.object )
+            downloadJSON(this.object, 'Database')
+            downloadJSON(this.output, 'Output')
+        }
     }
-  }
-})
+} )

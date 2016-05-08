@@ -1,6 +1,5 @@
 body {
   font-family: sans-serif;
-  width: 960px;
   margin: 0 auto;
   color: #333;
 }
@@ -81,10 +80,12 @@ footer {
 	display: -ms-flex;
 	display: -webkit-flex;
 	display: flex;
+  justify-content: space-around;
 }
 
 .flexbox-container > div {
-	width: 50%;
+	/*width: 33%;*/
+  resize: both;
 }
 
 .flexbox-container > div:first-child {
@@ -93,4 +94,8 @@ footer {
 
 .flexbox-container > div:last-child {
   padding-left: 10px;
+}
+
+.CodeMirror {
+  height: auto;
 }
