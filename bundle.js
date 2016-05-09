@@ -27266,9 +27266,9 @@ function downloadJSON( data, id ) {
     container.replaceChild(link, container.firstChild);
 }
 
-function refreshJSON( obj ) {
-    downloadJSON(obj.object, 'Database');
-    downloadJSON(obj.output, 'Output');
+function refreshJSON( {object, output} ) {
+    downloadJSON(object, 'Database');
+    downloadJSON(output, 'Output');
 }
 
 downloadJSON(db.object,  'Database')
@@ -27290,16 +27290,24 @@ var editor = CodeMirror.fromTextArea( document.getElementById( 'code' ), {
         "Ctrl-/": "toggleComment",
         "Cmd-/": "toggleComment"
     },
-    onKeyEvent: function( i, e ) {
-        // Hook into ctrl-space
-        if ( e.keyCode == 32 && ( e.ctrlKey || e.metaKey ) && !e.altKey ) {
-            e.stop();
-            return startComplete();
-        }
-    },
     value: `<!doctype html>\n<html>\n  ${document.documentElement.innerHTML}\n</html>`
 
 } )
+
+function saveCode() {
+    localStorage.setItem('code', editor.getValue() )
+}
+function deleteCode() {
+    localStorage.removeItem('code')
+}
+
+function autosave( code ) {
+    localStorage.setItem('code', code )
+}
+
+function getCode() {
+    return localStorage.getItem('code')
+}
 
 const initialCode = [
     "// db is also available in the console",
@@ -27308,23 +27316,24 @@ const initialCode = [
     "  title: 'some post'",
     "})",
     "",
-    " // db('posts').find({ id: 5 })",
-    " // db('posts').find({ title: 'some post' })",
-    " // db('posts').last()",
-    " // db('posts').orderBy('id', 'desc')",
+    "// db('posts').find({ id: 5 })",
+    "// db('posts').find({ title: 'some post' })",
+    "// db('posts').last()",
+    "// db('posts').orderBy('id', 'desc')",
     "",
     "// GENERATE DATA",
     "",
     "const qs = 'rows=10&firstname={firstName}&age={numberRange|20,80}';",
     "const url = `http://www.filltext.com?${qs}`",
     "// or try http://faker.hook.io?property=name.findName&locale=en",
+    "// Promise will be resolved and update the vue",
     "fetch(url)",
     ".then( res => res.json() )",
     ".catch( e => console.error(e) )",
     ".then( json => db('users').push( ...json ) );",
     "",
     "// Use lodash/fp ",
-    "// with this, api.users give the URL of the 'users' service",
+    "// api.users give the URL of the 'users' service",
     "const entities = [ 'users', 'posts', 'login', 'reset', 'config'];",
     "const api = _.reduce( ",
     "  ( acc, key ) => _.assign( {",
@@ -27333,12 +27342,15 @@ const initialCode = [
     "",
     "// db('api').push({ entities: api })",
     "",
-    "// Autocompletion: ",
-    "// try writing _.<CTRL+SPACE>",
+    "// SHORTCUT: ",
+    "// Ctrl-Space ==> autocomplete ",
+    "// Ctrl-/ ==> toggleComment",
+    "// Ctrl-z ==> undo",
+    "// Ctrl-Shift-z ==> redo",
     "",
 ].join( '\n' )
 
-editor.getDoc().setValue( initialCode )
+editor.getDoc().setValue( getCode() || initialCode )
 
 
 // ----------------------------------------------------------
@@ -27357,7 +27369,29 @@ const vm = new Vue( {
     data: {
         error: '',
         output: '',
+        autosave: !!getCode(),
+        intervalId: 0,
+        intervalSec: 5,
         object: db.object
+    },
+    computed: {
+        intervalSave: function() {
+            if (this.autosave) {
+                if ( !this.intervalId ) {
+                    saveCode()
+                    const iid = setInterval(saveCode, this.interval);
+                    this.intervalId = iid
+                    return iid
+                }
+            } else {
+                if (this.intervalId){
+                    clearInterval(this.intervalId)
+                    this.intervalId = 0
+                }
+                return 0
+            }
+        },
+        interval: function(){ return this.intervalSec * 1000 }
     },
     methods: {
         eval: function() {
@@ -27365,17 +27399,28 @@ const vm = new Vue( {
             this.output = ''
 
             try {
-                this.output = eval( editor.getValue() )
+                const code = editor.getValue()
+
+                if (this.autosave) { autosave( code ) }
+
+                this.output = eval( code )
                 this.object = _.assign( {}, db.object )
-                refreshJSON(this)
-                if ( this.output.then ) {
-                    this.output.then( ( data ) => {
-                        // arrow function lexical scope
-                        this.object = _.assign( {}, db.object )
-                        this.output = data
-                        refreshJSON(this)
+
+                if ( this.output &&
+                    this.output.then &&
+                    _.isFunction(this.output.then) ) {
+                    const that = this;
+                    this.output.then( function( data ) {
+                        that.object = _.assign( {}, db.object )
+                        that.output = data
+                        refreshJSON(that)
                     } );
+                } else {
+                    refreshJSON(this)
                 }
+
+
+
             } catch ( e ) {
                 this.error = e.message
                 console.error( e )
@@ -27383,6 +27428,7 @@ const vm = new Vue( {
         },
         reset: function() {
             editor.getDoc().setValue( initialCode )
+            deleteCode()
             db.object = {}
             this.output = ''
             this.object = _.assign( {}, db.object )
@@ -27390,5 +27436,9 @@ const vm = new Vue( {
         }
     }
 } )
+
+vm.$watch('firstName', function (val) {
+  this.fullName = val + ' ' + this.lastName
+})
 
 },{"lodash/fp":2,"lowdb":9,"lowdb/browser":8,"vue":11}]},{},[12]);

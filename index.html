@@ -41,22 +41,25 @@
             </div>
             <div>
                 <h2>Code</h2>
-                <textarea id="code" ></textarea>
+                <textarea id="code"></textarea>
                 <p>
                     <button v-on:click.prevent="eval">Run</button>
                     <button v-on:click.prevent="reset">Reset</button>
+                    <input type="checkbox" id="checkbox" v-model="autosave">
+                    <label for="checkbox">save code every</label>
+                    <input style="width: 40px;text-align: right;" type="text" v-model="intervalSec" number placeholder="set the interval"> seconds.
                 </p>
                 <p>
                     <small>
-            Lowdb supports file, browser or custom storage.<br>
-            For demo purpose, in-memory storage is used.
-          </small>
+                        Lowdb supports file, browser or custom storage.<br>
+                        For demo purpose, browser storage (localStorage) is used.
+                    </small>
                 </p>
                 <p id="error" v-if="error">Error: {{ error }}</p>
             </div>
 
             <div>
-                <h2 id="Output" >Output</h2>
+                <h2 id="Output">Output</h2>
                 <pre><code class="hljs css">{{{ output | stringify | highlight }}}</code></pre>
             </div>
         </div>
