@@ -84,7 +84,7 @@ footer {
 }
 
 .flexbox-container > div {
-	/*width: 33%;*/
+	width: 100%;
   resize: both;
 }
 

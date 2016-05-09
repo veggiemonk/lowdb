@@ -27266,6 +27266,11 @@ function downloadJSON( data, id ) {
     container.replaceChild(link, container.firstChild);
 }
 
+function refreshJSON( obj ) {
+    downloadJSON(obj.object, 'Database');
+    downloadJSON(obj.output, 'Output');
+}
+
 downloadJSON(db.object,  'Database')
 
 // ----------------------------------------------------------
@@ -27279,7 +27284,12 @@ var editor = CodeMirror.fromTextArea( document.getElementById( 'code' ), {
     lineNumbers: true,
     styleActiveLine: true,
     matchBrackets: true,
-    extraKeys: { "Ctrl-Space": "autocomplete" },
+    extraKeys: {
+        "Ctrl-Space": "autocomplete",
+        "Cmd-Space": "autocomplete",
+        "Ctrl-/": "toggleComment",
+        "Cmd-/": "toggleComment"
+    },
     onKeyEvent: function( i, e ) {
         // Hook into ctrl-space
         if ( e.keyCode == 32 && ( e.ctrlKey || e.metaKey ) && !e.altKey ) {
@@ -27313,6 +27323,7 @@ const initialCode = [
     ".catch( e => console.error(e) )",
     ".then( json => db('users').push( ...json ) );",
     "",
+    "// Use lodash/fp ",
     "// with this, api.users give the URL of the 'users' service",
     "const entities = [ 'users', 'posts', 'login', 'reset', 'config'];",
     "const api = _.reduce( ",
@@ -27321,6 +27332,10 @@ const initialCode = [
     "  } )( acc ), {} )( entities );",
     "",
     "// db('api').push({ entities: api })",
+    "",
+    "// Autocompletion: ",
+    "// try writing _.<CTRL+SPACE>",
+    "",
 ].join( '\n' )
 
 editor.getDoc().setValue( initialCode )
@@ -27351,30 +27366,27 @@ const vm = new Vue( {
 
             try {
                 this.output = eval( editor.getValue() )
-                this.object = Object.assign( {}, db.object )
-                downloadJSON(this.object, 'Database')
-                downloadJSON(this.output, 'Output')
+                this.object = _.assign( {}, db.object )
+                refreshJSON(this)
                 if ( this.output.then ) {
-                    const that = this;
-                    this.output.then( function( data ) {
-                        that.object = _.assign( {}, db.object )
-                        that.output = data;
-                        downloadJSON(that.object, 'Database')
-                        downloadJSON(that.output, 'Output')
+                    this.output.then( ( data ) => {
+                        // arrow function lexical scope
+                        this.object = _.assign( {}, db.object )
+                        this.output = data
+                        refreshJSON(this)
                     } );
                 }
             } catch ( e ) {
                 this.error = e.message
-                throw new Error( e )
+                console.error( e )
             }
         },
         reset: function() {
             editor.getDoc().setValue( initialCode )
             db.object = {}
             this.output = ''
-            this.object = Object.assign( {}, db.object )
-            downloadJSON(this.object, 'Database')
-            downloadJSON(this.output, 'Output')
+            this.object = _.assign( {}, db.object )
+            refreshJSON(this)
         }
     }
 } )
